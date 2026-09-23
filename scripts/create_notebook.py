@@ -1,0 +1,352 @@
+"""
+create_notebook.py
+Generates the complete Jupyter Notebook for Phase 02 exploration of the Zava DIY Retail dataset,
+addressing every question from Step 5 of the guide.
+"""
+import json
+from pathlib import Path
+
+def create_notebook():
+    nb = {
+        "cells": [
+            {
+                "cell_type": "markdown",
+                "metadata": {},
+                "source": [
+                    "# 🛒 COMPSCI 714 — Phase 02: Step 5 Data Exploration\n",
+                    "**Zava DIY Retail Dataset: Empirical Analysis & Problem Formulation**\n",
+                    "\n",
+                    "This notebook answers the 7 exploratory questions required by **Step 5: Do the exploration** of the Phase 02 Guide."
+                ]
+            },
+            {
+                "cell_type": "markdown",
+                "metadata": {},
+                "source": [
+                    "## 📦 Setup & Database Helper\n",
+                    "Run this cell first to initialize the database connection and the `query(sql)` helper."
+                ]
+            },
+            {
+                "cell_type": "code",
+                "execution_count": None,
+                "metadata": {},
+                "outputs": [],
+                "source": [
+                    "# Install dependencies if needed:\n",
+                    "# !pip install asyncpg pandas nest_asyncio\n",
+                    "\n",
+                    "import asyncio\n",
+                    "import nest_asyncio\n",
+                    "import asyncpg\n",
+                    "import pandas as pd\n",
+                    "\n",
+                    "nest_asyncio.apply()\n",
+                    "\n",
+                    "POSTGRES_URL = 'postgresql://store_manager:StoreManager123!@127.0.0.1:15432/zava'\n",
+                    "SUPER_ADMIN_ID = '00000000-0000-0000-0000-000000000000'\n",
+                    "\n",
+                    "async def run_query(sql, *args):\n",
+                    "    conn = await asyncpg.connect(POSTGRES_URL)\n",
+                    "    try:\n",
+                    "        await conn.execute(f\"SET app.current_rls_user_id = '{SUPER_ADMIN_ID}';\")\n",
+                    "        records = await conn.fetch(sql, *args)\n",
+                    "        if not records:\n",
+                    "            return pd.DataFrame()\n",
+                    "        return pd.DataFrame(records, columns=list(records[0].keys()))\n",
+                    "    finally:\n",
+                    "        await conn.close()\n",
+                    "\n",
+                    "def query(sql, *args):\n",
+                    "    return asyncio.run(run_query(sql, *args))\n",
+                    "\n",
+                    "print('Database connection ready! Super Admin RLS context active.')"
+                ]
+            },
+            {
+                "cell_type": "markdown",
+                "metadata": {},
+                "source": [
+                    "### ❓ Question 1: Which category has the sharpest seasonal swing, and how far ahead would you need to act on it?"
+                ]
+            },
+            {
+                "cell_type": "code",
+                "execution_count": None,
+                "metadata": {},
+                "outputs": [],
+                "source": [
+                    "q1_sql = '''\n",
+                    "WITH monthly AS (\n",
+                    "    SELECT \n",
+                    "        c.category_name,\n",
+                    "        EXTRACT(MONTH FROM o.order_date)::int as mo,\n",
+                    "        SUM(oi.quantity) as qty\n",
+                    "    FROM retail.categories c\n",
+                    "    JOIN retail.products p ON c.category_id = p.category_id\n",
+                    "    JOIN retail.order_items oi ON p.product_id = oi.product_id\n",
+                    "    JOIN retail.orders o ON oi.order_id = o.order_id\n",
+                    "    GROUP BY c.category_name, mo\n",
+                    ")\n",
+                    "SELECT \n",
+                    "    category_name,\n",
+                    "    MIN(qty) as min_monthly_units,\n",
+                    "    MAX(qty) as max_monthly_units,\n",
+                    "    ROUND((MAX(qty)::numeric / NULLIF(MIN(qty), 0)), 2) as seasonal_swing_ratio\n",
+                    "FROM monthly\n",
+                    "GROUP BY category_name\n",
+                    "ORDER BY seasonal_swing_ratio DESC;\n",
+                    "'''\n",
+                    "df_q1 = query(q1_sql)\n",
+                    "df_q1"
+                ]
+            },
+            {
+                "cell_type": "markdown",
+                "metadata": {},
+                "source": [
+                    "### ❓ Question 2: Which stores are most and least aligned to the national seasonal pattern?"
+                ]
+            },
+            {
+                "cell_type": "code",
+                "execution_count": None,
+                "metadata": {},
+                "outputs": [],
+                "source": [
+                    "q2_sql = '''\n",
+                    "WITH national AS (\n",
+                    "    SELECT \n",
+                    "        EXTRACT(MONTH FROM order_date)::int as mo,\n",
+                    "        COUNT(*)::float / (SELECT COUNT(*) FROM retail.orders) as nat_share\n",
+                    "    FROM retail.orders\n",
+                    "    GROUP BY mo\n",
+                    "),\n",
+                    "store_monthly AS (\n",
+                    "    SELECT \n",
+                    "        s.store_name,\n",
+                    "        EXTRACT(MONTH FROM o.order_date)::int as mo,\n",
+                    "        COUNT(*)::float / SUM(COUNT(*)) OVER (PARTITION BY s.store_id) as store_share\n",
+                    "    FROM retail.stores s\n",
+                    "    JOIN retail.orders o ON s.store_id = o.store_id\n",
+                    "    GROUP BY s.store_name, s.store_id, mo\n",
+                    ")\n",
+                    "SELECT \n",
+                    "    sm.store_name,\n",
+                    "    ROUND(SUM(ABS(sm.store_share - n.nat_share))::numeric * 100, 2) as deviation_from_national_pct\n",
+                    "FROM store_monthly sm\n",
+                    "JOIN national n ON sm.mo = n.mo\n",
+                    "GROUP BY sm.store_name\n",
+                    "ORDER BY deviation_from_national_pct ASC;\n",
+                    "'''\n",
+                    "df_q2 = query(q2_sql)\n",
+                    "df_q2"
+                ]
+            },
+            {
+                "cell_type": "markdown",
+                "metadata": {},
+                "source": [
+                    "### ❓ Question 3: What actually happened in 2023? Which categories, which stores, which months?"
+                ]
+            },
+            {
+                "cell_type": "code",
+                "execution_count": None,
+                "metadata": {},
+                "outputs": [],
+                "source": [
+                    "# 3A. Year-over-Year Revenue (identifying the 2023 dip)\n",
+                    "yoy_sql = '''\n",
+                    "SELECT \n",
+                    "    EXTRACT(YEAR FROM o.order_date)::int as year,\n",
+                    "    COUNT(DISTINCT o.order_id) as total_orders,\n",
+                    "    ROUND(SUM(oi.unit_price * oi.quantity)::numeric, 2) as annual_revenue\n",
+                    "FROM retail.orders o\n",
+                    "JOIN retail.order_items oi ON o.order_id = oi.order_id\n",
+                    "GROUP BY year ORDER BY year;\n",
+                    "'''\n",
+                    "df_yoy = query(yoy_sql)\n",
+                    "df_yoy['revenue_growth_pct'] = df_yoy['annual_revenue'].pct_change() * 100\n",
+                    "display(df_yoy)\n",
+                    "\n",
+                    "# 3B. Which categories were hit hardest in 2023 vs 2022?\n",
+                    "cat_dip_sql = '''\n",
+                    "SELECT \n",
+                    "    c.category_name,\n",
+                    "    ROUND(SUM(CASE WHEN EXTRACT(YEAR FROM o.order_date) = 2022 THEN oi.unit_price * oi.quantity ELSE 0 END)::numeric, 2) as rev_2022,\n",
+                    "    ROUND(SUM(CASE WHEN EXTRACT(YEAR FROM o.order_date) = 2023 THEN oi.unit_price * oi.quantity ELSE 0 END)::numeric, 2) as rev_2023,\n",
+                    "    ROUND(((SUM(CASE WHEN EXTRACT(YEAR FROM o.order_date) = 2023 THEN oi.unit_price * oi.quantity ELSE 0 END) -\n",
+                    "            SUM(CASE WHEN EXTRACT(YEAR FROM o.order_date) = 2022 THEN oi.unit_price * oi.quantity ELSE 0 END)) /\n",
+                    "            NULLIF(SUM(CASE WHEN EXTRACT(YEAR FROM o.order_date) = 2022 THEN oi.unit_price * oi.quantity ELSE 0 END), 0) * 100)::numeric, 2) as pct_change\n",
+                    "FROM retail.categories c\n",
+                    "JOIN retail.products p ON c.category_id = p.category_id\n",
+                    "JOIN retail.order_items oi ON p.product_id = oi.product_id\n",
+                    "JOIN retail.orders o ON oi.order_id = o.order_id\n",
+                    "WHERE EXTRACT(YEAR FROM o.order_date) IN (2022, 2023)\n",
+                    "GROUP BY c.category_name\n",
+                    "ORDER BY pct_change ASC;\n",
+                    "'''\n",
+                    "df_cat_dip = query(cat_dip_sql)\n",
+                    "display(df_cat_dip)\n",
+                    "\n",
+                    "# 3C. Which months dipped most in 2023?\n",
+                    "mo_dip_sql = '''\n",
+                    "SELECT \n",
+                    "    EXTRACT(MONTH FROM o.order_date)::int as month,\n",
+                    "    ROUND(SUM(CASE WHEN EXTRACT(YEAR FROM o.order_date) = 2022 THEN oi.unit_price * oi.quantity ELSE 0 END)::numeric, 2) as rev_2022,\n",
+                    "    ROUND(SUM(CASE WHEN EXTRACT(YEAR FROM o.order_date) = 2023 THEN oi.unit_price * oi.quantity ELSE 0 END)::numeric, 2) as rev_2023,\n",
+                    "    ROUND(((SUM(CASE WHEN EXTRACT(YEAR FROM o.order_date) = 2023 THEN oi.unit_price * oi.quantity ELSE 0 END) -\n",
+                    "            SUM(CASE WHEN EXTRACT(YEAR FROM o.order_date) = 2022 THEN oi.unit_price * oi.quantity ELSE 0 END)) /\n",
+                    "            NULLIF(SUM(CASE WHEN EXTRACT(YEAR FROM o.order_date) = 2022 THEN oi.unit_price * oi.quantity ELSE 0 END), 0) * 100)::numeric, 2) as pct_change\n",
+                    "FROM retail.orders o\n",
+                    "JOIN retail.order_items oi ON o.order_id = oi.order_id\n",
+                    "WHERE EXTRACT(YEAR FROM o.order_date) IN (2022, 2023)\n",
+                    "GROUP BY month ORDER BY month;\n",
+                    "'''\n",
+                    "df_mo_dip = query(mo_dip_sql)\n",
+                    "display(df_mo_dip)"
+                ]
+            },
+            {
+                "cell_type": "markdown",
+                "metadata": {},
+                "source": [
+                    "### ❓ Question 4: Which products are frequently bought together, and does that differ by store or season?"
+                ]
+            },
+            {
+                "cell_type": "code",
+                "execution_count": None,
+                "metadata": {},
+                "outputs": [],
+                "source": [
+                    "q4_sql = '''\n",
+                    "SELECT \n",
+                    "    CASE \n",
+                    "        WHEN EXTRACT(MONTH FROM o.order_date) IN (6,7,8) THEN 'Summer'\n",
+                    "        WHEN EXTRACT(MONTH FROM o.order_date) IN (12,1,2) THEN 'Winter'\n",
+                    "        ELSE 'Spring/Fall'\n",
+                    "    END as season,\n",
+                    "    p1.product_name as product_a,\n",
+                    "    p2.product_name as product_b,\n",
+                    "    COUNT(*) as basket_co_purchases\n",
+                    "FROM retail.order_items oi1\n",
+                    "JOIN retail.order_items oi2 ON oi1.order_id = oi2.order_id AND oi1.product_id < oi2.product_id\n",
+                    "JOIN retail.orders o ON oi1.order_id = o.order_id\n",
+                    "JOIN retail.products p1 ON oi1.product_id = p1.product_id\n",
+                    "JOIN retail.products p2 ON oi2.product_id = p2.product_id\n",
+                    "GROUP BY season, product_a, product_b\n",
+                    "ORDER BY basket_co_purchases DESC\n",
+                    "LIMIT 10;\n",
+                    "'''\n",
+                    "df_q4 = query(q4_sql)\n",
+                    "df_q4"
+                ]
+            },
+            {
+                "cell_type": "markdown",
+                "metadata": {},
+                "source": [
+                    "### ❓ Questions 5 & 6: Where is inventory misaligned with demand? Which products have the widest gap between inventory levels and sales velocity?"
+                ]
+            },
+            {
+                "cell_type": "code",
+                "execution_count": None,
+                "metadata": {},
+                "outputs": [],
+                "source": [
+                    "q5_sql = '''\n",
+                    "WITH monthly_velocity AS (\n",
+                    "    SELECT \n",
+                    "        oi.product_id,\n",
+                    "        o.store_id,\n",
+                    "        ROUND(SUM(oi.quantity)::numeric / 84, 2) as monthly_sales_velocity -- 84 months (7 years)\n",
+                    "    FROM retail.order_items oi\n",
+                    "    JOIN retail.orders o ON oi.order_id = o.order_id\n",
+                    "    GROUP BY oi.product_id, o.store_id\n",
+                    ")\n",
+                    "SELECT \n",
+                    "    s.store_name,\n",
+                    "    p.product_name,\n",
+                    "    i.stock_level,\n",
+                    "    COALESCE(mv.monthly_sales_velocity, 0.05) as monthly_velocity,\n",
+                    "    ROUND((i.stock_level / NULLIF(mv.monthly_sales_velocity, 0))::numeric, 1) as months_of_supply\n",
+                    "FROM retail.inventory i\n",
+                    "JOIN retail.stores s ON i.store_id = s.store_id\n",
+                    "JOIN retail.products p ON i.product_id = p.product_id\n",
+                    "LEFT JOIN monthly_velocity mv ON i.product_id = mv.product_id AND i.store_id = mv.store_id\n",
+                    "WHERE mv.monthly_sales_velocity IS NOT NULL AND mv.monthly_sales_velocity > 0\n",
+                    "ORDER BY months_of_supply DESC\n",
+                    "LIMIT 10;\n",
+                    "'''\n",
+                    "df_q5 = query(q5_sql)\n",
+                    "df_q5"
+                ]
+            },
+            {
+                "cell_type": "markdown",
+                "metadata": {},
+                "source": [
+                    "### ❓ Question 7: How different does the data look when you query as a single store manager rather than the super manager?"
+                ]
+            },
+            {
+                "cell_type": "code",
+                "execution_count": None,
+                "metadata": {},
+                "outputs": [],
+                "source": [
+                    "async def rls_breakdown():\n",
+                    "    conn = await asyncpg.connect(POSTGRES_URL)\n",
+                    "    try:\n",
+                    "        total_orders = await conn.fetchval('SELECT count(*) FROM retail.orders;')\n",
+                    "        stores = await conn.fetch('SELECT store_id, store_name FROM retail.stores ORDER BY store_id;')\n",
+                    "        \n",
+                    "        data = [{\n",
+                    "            'Role / User Scope': 'Super Admin (00000000-0000...)',\n",
+                    "            'Visible Orders': total_orders,\n",
+                    "            'Data Visibility (%)': '100.0%'\n",
+                    "        }]\n",
+                    "        \n",
+                    "        for s in stores:\n",
+                    "            cnt = await conn.fetchval('SELECT count(*) FROM retail.orders WHERE store_id = $1;', s['store_id'])\n",
+                    "            data.append({\n",
+                    "                'Role / User Scope': f\"Store Manager {s['store_id']} ({s['store_name']})\",\n",
+                    "                'Visible Orders': cnt,\n",
+                    "                'Data Visibility (%)': f\"{cnt/total_orders*100:.2f}%\"\n",
+                    "            })\n",
+                    "            \n",
+                    "        return pd.DataFrame(data)\n",
+                    "    finally:\n",
+                    "        await conn.close()\n",
+                    "\n",
+                    "df_rls = asyncio.run(rls_breakdown())\n",
+                    "df_rls"
+                ]
+            }
+        ],
+        "metadata": {
+            "kernelspec": {
+                "display_name": "Python 3",
+                "language": "python",
+                "name": "python3"
+            },
+            "language_info": {
+                "name": "python",
+                "version": "3.11"
+            }
+        },
+        "nbformat": 4,
+        "nbformat_minor": 5
+    }
+
+    Path("notebooks").mkdir(parents=True, exist_ok=True)
+    out_path = Path("notebooks/02_zava_deep_dive.ipynb")
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(nb, f, indent=2)
+    print(f"[OK] Notebook updated successfully at {out_path}")
+
+if __name__ == "__main__":
+    create_notebook()

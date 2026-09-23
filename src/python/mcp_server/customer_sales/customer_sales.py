@@ -132,10 +132,12 @@ async def get_current_utc_date() -> str:
         return f"Error retrieving current UTC date: {e!s}"
 
 
-async def run_http_server() -> None:
+async def run_http_server(host: str = "127.0.0.1", port: int = 8000) -> None:
     """Run the MCP server in HTTP mode."""
+    mcp.settings.host = host
+    mcp.settings.port = port
     print(
-        f"📡 MCP endpoint available at: http://{mcp.settings.host}:{mcp.settings.port}/mcp")
+        f"📡 MCP endpoint available at: http://{host}:{port}/mcp")
 
     # Run the FastMCP server as HTTP endpoint
     await mcp.run_streamable_http_async()
@@ -148,6 +150,8 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--stdio", action="store_true",
                         help="Run server in stdio mode")
+    parser.add_argument("--host", type=str, default="127.0.0.1", help="Host for HTTP mode")
+    parser.add_argument("--port", type=int, default=8000, help="Port for HTTP mode")
     parser.add_argument("--RLS_USER_ID", type=str,
                         default=None, help="Row Level Security User ID")
     args = parser.parse_args()
@@ -159,7 +163,7 @@ def main() -> None:
         mcp.run()
     else:
         # Run the HTTP server
-        asyncio.run(run_http_server())
+        asyncio.run(run_http_server(args.host, args.port))
 
 
 if __name__ == "__main__":

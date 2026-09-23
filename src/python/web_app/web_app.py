@@ -10,13 +10,18 @@ Web interface available at: http://127.0.0.1:8005
 
 import json
 import logging
+import os
 import sys
 from pathlib import Path
-from typing import AsyncGenerator, Dict, List
+from typing import AsyncGenerator, Dict, List, Optional
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Add workshop folder to path to import shared modules
 sys.path.append(str(Path(__file__).parent.parent / "workshop"))
 
+import asyncpg
 import httpx
 from fastapi import FastAPI, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
@@ -36,6 +41,10 @@ class WebApp:
         """Initialize the web interface with FastAPI app."""
         self.app = app
         self.chat_sessions: Dict[str, List[Dict]] = {}
+        self.postgres_url = os.getenv(
+            "POSTGRES_URL", "postgresql://store_manager:StoreManager123!@127.0.0.1:15432/zava"
+        )
+        self.rls_user_id = os.getenv("RLS_USER_ID", "00000000-0000-0000-0000-000000000000")
         
         self._setup_routes()
         self._setup_static_files()
@@ -44,6 +53,11 @@ class WebApp:
         """Setup static file serving."""
         static_dir = Path(__file__).parent.parent.parent / "shared" / "static"
         self.app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+        
+        # Mount product images directory
+        images_dir = Path(__file__).resolve().parent.parent.parent.parent / "images"
+        if images_dir.exists():
+            self.app.mount("/images", StaticFiles(directory=str(images_dir)), name="images")
     
     def _setup_routes(self) -> None:
         """Setup all web routes."""
@@ -53,12 +67,17 @@ class WebApp:
         self.app.get("/chat/stream")(self.stream_chat)
         self.app.get("/files/{filename}")(self.serve_file)
         self.app.get("/health")(self.health_check)
+        self.app.get("/api/categories")(self.get_categories)
+        self.app.get("/api/products")(self.get_products)
     
     async def get_chat_page(self) -> HTMLResponse:
         """Serve the chat HTML page."""
         html_file = Path(__file__).parent.parent.parent / "shared" / "static" / "index.html"
-        with html_file.open("r") as f:
-            return HTMLResponse(content=f.read())
+        with html_file.open("r", encoding="utf-8") as f:
+            return HTMLResponse(
+                content=f.read(),
+                headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+            )
     
     async def get_favicon(self) -> FileResponse:
         """Serve the favicon.ico file."""
@@ -240,6 +259,74 @@ class WebApp:
                 **web_status,
                 "agent_service": {"status": "error", "error": str(e)}
             }
+
+    async def get_categories(self) -> Dict:
+        """Return all distinct categories with product counts."""
+        try:
+            conn = await asyncpg.connect(self.postgres_url)
+            await conn.execute("SELECT set_config('app.current_rls_user_id', $1, false)", self.rls_user_id)
+            rows = await conn.fetch("""
+                SELECT c.category_name, COUNT(p.product_id) as product_count
+                FROM retail.categories c
+                JOIN retail.products p ON c.category_id = p.category_id
+                GROUP BY c.category_name
+                ORDER BY c.category_name;
+            """)
+            await conn.close()
+            return {"categories": [dict(r) for r in rows]}
+        except Exception as e:
+            return {"categories": [], "error": str(e)}
+
+    async def get_products(
+        self, 
+        category: Optional[str] = None, 
+        search: Optional[str] = None, 
+        limit: int = 40, 
+        offset: int = 0
+    ) -> Dict:
+        """Return catalog products with images, prices, and stock."""
+        try:
+            conn = await asyncpg.connect(self.postgres_url)
+            await conn.execute("SELECT set_config('app.current_rls_user_id', $1, false)", self.rls_user_id)
+            
+            cat_filter = f"%{category.strip()}%" if category and category != "All" else None
+            search_filter = f"%{search.strip()}%" if search and search.strip() else None
+
+            query = """
+                SELECT 
+                    p.product_id,
+                    p.sku,
+                    p.product_name,
+                    p.product_description,
+                    CAST(p.base_price AS FLOAT) as base_price,
+                    c.category_name,
+                    pt.type_name,
+                    COALESCE(pie.image_url, '') AS image_url,
+                    COALESCE(SUM(i.stock_level), 0) AS total_stock
+                FROM retail.products p
+                JOIN retail.categories c ON p.category_id = c.category_id
+                JOIN retail.product_types pt ON p.type_id = pt.type_id
+                LEFT JOIN retail.product_image_embeddings pie ON p.product_id = pie.product_id
+                LEFT JOIN retail.inventory i ON p.product_id = i.product_id
+                WHERE ($1::text IS NULL OR c.category_name ILIKE $1)
+                  AND ($2::text IS NULL OR p.product_name ILIKE $2 OR p.product_description ILIKE $2)
+                GROUP BY p.product_id, p.sku, p.product_name, p.product_description, p.base_price, c.category_name, pt.type_name, pie.image_url
+                ORDER BY p.product_name
+                LIMIT $3 OFFSET $4;
+            """
+            
+            rows = await conn.fetch(query, cat_filter, search_filter, limit, offset)
+            await conn.close()
+            
+            products = [dict(r) for r in rows]
+            return {
+                "products": products,
+                "count": len(products),
+                "limit": limit,
+                "offset": offset
+            }
+        except Exception as e:
+            return {"products": [], "error": str(e)}
 
 
 # FastAPI app

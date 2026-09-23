@@ -69,17 +69,25 @@ class SemanticSearchTextEmbedding:
             # Fallback to default behavior
             load_dotenv()
     
-    def _setup_azure_openai_client(self) -> AzureOpenAI:
-        """Setup and return Azure OpenAI client with token provider."""
+    def _setup_azure_openai_client(self):
+        """Setup and return Azure OpenAI or OpenAI client."""
+        api_key = os.getenv("AZURE_OPENAI_KEY")
+        if api_key:
+            from openai import OpenAI
+            return OpenAI(
+                base_url=self.endpoint,
+                api_key=api_key
+            )
+
         token_provider = get_bearer_token_provider(
             DefaultAzureCredential(), 
             "https://cognitiveservices.azure.com/.default"
         )
         api_version = "2024-02-01"
-        
+        base_endpoint = self.endpoint.replace("/openai/v1", "").rstrip("/")
         return AzureOpenAI(
             api_version=api_version,
-            azure_endpoint=self.endpoint,
+            azure_endpoint=base_endpoint,
             azure_ad_token_provider=token_provider,
         )
     
@@ -108,7 +116,7 @@ class SemanticSearchTextEmbedding:
             
             # Extract embedding from response
             embedding = response.data[0].embedding
-            print(f"✓ Generated embedding (dimension: {len(embedding)})")
+            print(f"[OK] Generated embedding (dimension: {len(embedding)})")
             return embedding
             
         except Exception as e:
