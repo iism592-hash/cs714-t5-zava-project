@@ -206,7 +206,7 @@ module postgresServer 'postgres.bicep' = {
   name: 'postgresql'
   scope: rg
   params: {
-    name: '${resourcePrefix}-${uniqueSuffix}-postgresql'
+    name: toLower('${resourcePrefix}-${uniqueSuffix}-postgresql')
     location: location
     tags: tags
     sku: {

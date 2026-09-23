@@ -340,5 +340,6 @@ if __name__ == "__main__":
     import uvicorn
 
     print("Starting web interface...")
-    print(f"Agent service URL: {AGENT_SERVICE_URL}")
-    uvicorn.run(app, host="127.0.0.1", port=8005)
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "8005"))
+    uvicorn.run(app, host=host, port=port)

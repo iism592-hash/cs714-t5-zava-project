@@ -1,10 +1,10 @@
 Write-Host "Deploying the Azure resources..."
 
 # Define resource group parameters
-$RG_LOCATION = "westus"
+$RG_LOCATION = "australiaeast"
 $AI_PROJECT_FRIENDLY_NAME = "Zava Agent Service Workshop"
 $RESOURCE_PREFIX = "zava-agent-wks"
-$UNIQUE_SUFFIX = -join ((65..90) + (97..122) | Get-Random -Count 4 | ForEach-Object { [char]$_ })
+$UNIQUE_SUFFIX = -join ((97..122) | Get-Random -Count 4 | ForEach-Object { [char]$_ })
 
 # Deploy the Azure resources and save output to JSON (capture errors to deploy.err like deploy.sh)
 Write-Host " Creating agent workshop resources in resource group: rg-$RESOURCE_PREFIX-$UNIQUE_SUFFIX " -BackgroundColor Red -ForegroundColor White
@@ -78,7 +78,7 @@ if (Test-Path $ENV_FILE_PATH) {
 # Create a new workshop .env file and write to it
 @"
 PROJECT_ENDPOINT=$projectsEndpoint
-GPT_MODEL_DEPLOYMENT_NAME="gpt-4o-mini"
+GPT_MODEL_DEPLOYMENT_NAME="gpt-4o"
 EMBEDDING_MODEL_DEPLOYMENT_NAME="text-embedding-3-small"
 APPLICATIONINSIGHTS_CONNECTION_STRING="$applicationInsightsConnectionString"
 POSTGRES_SERVER_FQDN="$postgresServerFqdn"
@@ -133,7 +133,7 @@ $ROOT_ENV_FILE_PATH = "../.env"
 @"
 AZURE_OPENAI_ENDPOINT="$azureOpenAIEndpoint"
 PROJECT_ENDPOINT="$projectsEndpoint"
-GPT_MODEL_DEPLOYMENT_NAME="gpt-4o-mini"
+GPT_MODEL_DEPLOYMENT_NAME="gpt-4o"
 EMBEDDING_MODEL_DEPLOYMENT_NAME="text-embedding-3-small"
 APPLICATIONINSIGHTS_CONNECTION_STRING="$applicationInsightsConnectionString"
 POSTGRES_SERVER_FQDN="$postgresServerFqdn"

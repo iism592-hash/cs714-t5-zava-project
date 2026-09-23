@@ -3,7 +3,7 @@
   "contentVersion": "1.0.0.0",
   "parameters": {
     "location": {
-      "value": "westus"
+      "value": "australiaeast"
     },
     "aiProjectFriendlyName": {
       "value": "Zava Agent Service Workshop"
@@ -14,11 +14,11 @@
     "models": {
       "value": [
         {
-          "name": "gpt-4o-mini",
+          "name": "gpt-4o",
           "format": "OpenAI",
-          "version": "2024-07-18",
+          "version": "2024-11-20",
           "skuName": "GlobalStandard",
-          "capacity": 120
+          "capacity": 50
         },
         {
           "name": "text-embedding-3-small",
@@ -30,7 +30,7 @@
       ]
     },
     "deployCohereRerank": {
-      "value": true
+      "value": false
     }
   }
 }

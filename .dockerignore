@@ -4,4 +4,11 @@
 .ruff_cache
 .vscode
 .env
-__pycache__`
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+infra/
+stages/
+tests/
+notebooks/

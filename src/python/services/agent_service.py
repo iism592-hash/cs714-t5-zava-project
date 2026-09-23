@@ -93,6 +93,11 @@ safety_officer = SafetyOfficerAgent(call_llm)
 synthesizer = SynthesizerAgent(call_llm)
 
 
+def sse_event(payload: dict) -> str:
+    """Format dictionary as Server-Sent Event (SSE) string."""
+    return f"data: {json.dumps(payload)}\n\n"
+
+
 # =============================================================================
 # STREAMING MULTI-AGENT PIPELINE
 # =============================================================================
@@ -103,41 +108,46 @@ async def multi_agent_stream(user_query: str) -> AsyncGenerator[str, None]:
     """
     try:
         # Step 1: Agent 1 - Supervisor
-        yield f"data: {json.dumps({'content': '👔 **Supervisor:** Analyzing your project requirements...\n\n'})}\n\n"
+        msg_1 = "👔 **Supervisor:** Analyzing your project requirements...\n\n"
+        yield sse_event({"content": msg_1})
         await asyncio.sleep(0.3)
 
         plan = supervisor.plan_project(user_query)
         search_term = plan.get("search_term", "Hammer Drill")
         task_desc = plan.get("task_description", user_query)
 
-        yield f"data: {json.dumps({'content': f'📋 **Supervisor Plan:** Target tool: `{search_term}`. Task: *{task_desc}*\n\n'})}\n\n"
+        msg_plan = f"📋 **Supervisor Plan:** Target tool: `{search_term}`. Task: *{task_desc}*\n\n"
+        yield sse_event({"content": msg_plan})
         await asyncio.sleep(0.3)
 
         # Step 2: Agent 2 - Inventory Specialist (MCP + pgvector)
-        yield f"data: {json.dumps({'content': f'📦 **Inventory Specialist:** Querying live database for `{search_term}` via FastMCP...\n\n'})}\n\n"
+        msg_inv = f"📦 **Inventory Specialist:** Querying live database for `{search_term}` via FastMCP...\n\n"
+        yield sse_event({"content": msg_inv})
         inventory_data = await inventory_specialist.query_inventory(search_term)
 
         # Step 3: Agent 3 - Safety Specialist
-        yield f"data: {json.dumps({'content': '🦺 **Safety Officer:** Evaluating OSHA protocols, silica hazards & PPE requirements...\n\n'})}\n\n"
+        msg_safety = "🦺 **Safety Officer:** Evaluating OSHA protocols, silica hazards & PPE requirements...\n\n"
+        yield sse_event({"content": msg_safety})
         await asyncio.sleep(0.3)
 
         safety_data = safety_officer.evaluate_safety(task_desc)
 
         # Step 4: Agent 4 - Response Synthesizer
-        yield f"data: {json.dumps({'content': '📝 **Synthesizer:** Generating your comprehensive DIY Project Blueprint...\n\n---\n\n'})}\n\n"
+        msg_synth = "📝 **Synthesizer:** Generating your comprehensive DIY Project Blueprint...\n\n---\n\n"
+        yield sse_event({"content": msg_synth})
         await asyncio.sleep(0.3)
 
         final_guide = synthesizer.synthesize_blueprint(user_query, inventory_data, safety_data)
 
         # Stream the synthesized output
-        yield f"data: {json.dumps({'content': final_guide})}\n\n"
+        yield sse_event({"content": final_guide})
 
         # Signal completion to web_app.py
-        yield f"data: {json.dumps({'done': True})}\n\n"
+        yield sse_event({"done": True})
 
     except Exception as e:
-        yield f"data: {json.dumps({'error': f'Agent error: {str(e)}'})}\n\n"
-        yield f"data: {json.dumps({'done': True})}\n\n"
+        yield sse_event({"error": f"Agent error: {str(e)}"})
+        yield sse_event({"done": True})
 
 
 # =============================================================================

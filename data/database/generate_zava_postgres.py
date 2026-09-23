@@ -64,13 +64,29 @@ fake = Faker()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # PostgreSQL connection configuration
-POSTGRES_CONFIG = {
-    'host': 'db',
-    'port': 5432,
-    'user': 'postgres',
-    'password': 'P@ssw0rd!',
-    'database': 'zava'
-}
+from urllib.parse import urlparse
+
+postgres_url_env = os.getenv("POSTGRES_URL")
+if postgres_url_env:
+    _parsed = urlparse(postgres_url_env)
+    POSTGRES_CONFIG = {
+        'host': _parsed.hostname or 'localhost',
+        'port': _parsed.port or 5432,
+        'user': _parsed.username or 'postgres',
+        'password': _parsed.password or 'P@ssw0rd!',
+        'database': _parsed.path.lstrip('/') or 'zava',
+        'ssl': 'require' if 'azure.com' in (_parsed.hostname or '') or 'sslmode=require' in postgres_url_env else None
+    }
+    if not POSTGRES_CONFIG['ssl']:
+        del POSTGRES_CONFIG['ssl']
+else:
+    POSTGRES_CONFIG = {
+        'host': 'db',
+        'port': 5432,
+        'user': 'postgres',
+        'password': 'P@ssw0rd!',
+        'database': 'zava'
+    }
 
 SCHEMA_NAME = 'retail'
 
@@ -131,7 +147,7 @@ async def create_connection():
     """Create async PostgreSQL connection"""
     try:
         conn = await asyncpg.connect(**POSTGRES_CONFIG)
-        logging.info(f"Connected to PostgreSQL at {POSTGRES_CONFIG['host']}:{POSTGRES_CONFIG['port']}")
+        logging.info(f"Connected to PostgreSQL at {POSTGRES_CONFIG['host']}:{POSTGRES_CONFIG['port']}/{POSTGRES_CONFIG['database']}")
         return conn
     except Exception as e:
         logging.error(f"Failed to connect to PostgreSQL: {e}")
