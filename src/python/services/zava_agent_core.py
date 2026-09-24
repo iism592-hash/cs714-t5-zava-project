@@ -15,13 +15,15 @@ async def get_agent_response(user_input: str, history_context: str = "") -> str:
     
     azure_key = os.getenv("AZURE_OPENAI_KEY")
     azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+    api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
     openai_key = os.getenv("OPENAI_API_KEY")
     
     if azure_key and azure_endpoint:
         provider = OpenAIChatCompletionClient(
             model=get_model_name(),
             api_key=azure_key,
-            base_url=azure_endpoint
+            azure_endpoint=azure_endpoint,
+            api_version=api_version
         )
     else:
         provider = OpenAIChatCompletionClient(
