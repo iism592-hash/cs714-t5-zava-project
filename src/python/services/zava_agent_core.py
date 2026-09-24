@@ -64,7 +64,8 @@ async def get_agent_response(user_input: str, history_context: str = "") -> str:
                 "1. sales_analysis: Use this to query the PostgreSQL database for inventory, products, orders, and stores. "
                 "2. customer_sales: Use this for simple customer lookups. "
                 "3. enterprise_intel: Use this to get weather, logistics delays, competitor pricing, social sentiment, and macroeconomic indicators. "
-                "CRITICAL INSTRUCTION: If a user asks a business question that involves external factors (weather, competitors, sentiment), YOU MUST check the enterprise_intel tools FIRST, and then query the database to find the impacted inventory or stores."
+                "CRITICAL INSTRUCTION 1: If a user asks a business question that involves external factors (weather, competitors, sentiment), YOU MUST check the enterprise_intel tools FIRST, and then query the database to find the impacted inventory or stores. "
+                "CRITICAL INSTRUCTION 2: After presenting the data or answering any question, you MUST ALWAYS provide a 'Brief Analysis' section. Explain the business implications of the data, spot trends, or suggest actionable strategies for the store manager. "
                 "Do not answer general programming or unrelated questions."
             ),
             tools=[mcp_sales, mcp_analysis, mcp_enterprise]
