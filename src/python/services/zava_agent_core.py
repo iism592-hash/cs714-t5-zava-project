@@ -4,6 +4,8 @@ import asyncio
 from agent_framework.openai import OpenAIChatCompletionClient
 from agent_framework import MCPStdioTool
 
+from azure.identity import AzureCliCredential
+
 # Import unified LLM config
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from shared.llm_config import get_model_name
@@ -13,12 +15,20 @@ async def get_agent_response(user_input: str, history_context: str = "") -> str:
     Core Single-Agent logic for Zava AI Analyst.
     """
     
+    ai_project_endpoint = os.getenv("AZURE_AI_PROJECT_ENDPOINT")
     azure_key = os.getenv("AZURE_OPENAI_KEY")
     azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
     api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
     openai_key = os.getenv("OPENAI_API_KEY")
     
-    if azure_key and azure_endpoint:
+    if ai_project_endpoint:
+        provider = OpenAIChatCompletionClient(
+            model=get_model_name(),
+            credential=AzureCliCredential(),
+            azure_endpoint=ai_project_endpoint,
+            api_version=api_version
+        )
+    elif azure_key and azure_endpoint:
         provider = OpenAIChatCompletionClient(
             model=get_model_name(),
             api_key=azure_key,
