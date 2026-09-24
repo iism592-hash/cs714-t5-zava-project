@@ -45,21 +45,15 @@ from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-# OpenAI SDK for live Azure Model
-from openai import OpenAI
+from shared.llm_config import get_azure_or_openai_client, get_model_name
 
 # Environment Variables
-AZURE_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
-AZURE_KEY = os.getenv("AZURE_OPENAI_KEY")
-MODEL_NAME = os.getenv("GPT_MODEL_DEPLOYMENT_NAME", "gpt-5.4-nano")
+MODEL_NAME = get_model_name()
 MCP_SERVER_URL = "http://127.0.0.1:8000/mcp"
 RLS_USER_ID = os.getenv("RLS_USER_ID", "00000000-0000-0000-0000-000000000000")
 
-# Initialize OpenAI client
-client = OpenAI(
-    base_url=AZURE_ENDPOINT,
-    api_key=AZURE_KEY
-)
+# Initialize OpenAI client using unified config
+client = get_azure_or_openai_client(is_async=False)
 
 app = FastAPI(title="Zava DIY Multi-Agent Backend Service")
 

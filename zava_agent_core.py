@@ -1,35 +1,25 @@
 import sys
 import os
 import asyncio
-from openai import AsyncOpenAI
 from agent_framework.openai import OpenAIChatCompletionClient
 from agent_framework import MCPStdioTool
+
+# Import unified LLM config
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'src', 'python')))
+from shared.llm_config import get_azure_or_openai_client, get_model_name
 
 async def get_agent_response(user_input: str, history_context: str = "") -> str:
     """
     Core Single-Agent logic for Zava AI Analyst.
-    Dynamically routes to Azure OpenAI if keys are present, otherwise defaults to standard OpenAI.
     """
     
-    azure_key = os.getenv("AZURE_OPENAI_KEY")
-    azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+    # Use centralized factory to get the correct AsyncOpenAI client
+    async_client = get_azure_or_openai_client(is_async=True)
     
-    if azure_key and azure_endpoint:
-        # Use Azure OpenAI endpoint via standard OpenAI client (simplest proxy method)
-        async_client = AsyncOpenAI(
-            base_url=azure_endpoint,
-            api_key=azure_key
-        )
-        provider = OpenAIChatCompletionClient(
-            client=async_client,
-            model=os.getenv("GPT_MODEL_DEPLOYMENT_NAME", "gpt-4o-mini")
-        )
-    else:
-        # Standard OpenAI Fallback
-        provider = OpenAIChatCompletionClient(
-            model="gpt-4o-mini",
-            api_key=os.getenv("OPENAI_API_KEY")
-        )
+    provider = OpenAIChatCompletionClient(
+        client=async_client,
+        model=get_model_name()
+    )
 
     # Tool 1: Customer Sales (Quick lookups)
     mcp_sales = MCPStdioTool(
