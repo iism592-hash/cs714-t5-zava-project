@@ -27,11 +27,12 @@ ROOT_DIR = Path(__file__).resolve().parents[3]
 load_dotenv(ROOT_DIR / ".env")
 load_dotenv()
 
-# Add agents package and MCP server to path
-AGENTS_DIR = Path(__file__).resolve().parent.parent / "agents"
-CUSTOMER_SALES_DIR = Path(__file__).resolve().parent.parent / "mcp_server" / "customer_sales"
+# Add agents package, MCP server, and src/python to path
+SRC_PYTHON_DIR = Path(__file__).resolve().parent.parent
+AGENTS_DIR = SRC_PYTHON_DIR / "agents"
+CUSTOMER_SALES_DIR = SRC_PYTHON_DIR / "mcp_server" / "customer_sales"
 
-for p in [AGENTS_DIR, CUSTOMER_SALES_DIR]:
+for p in [SRC_PYTHON_DIR, AGENTS_DIR, CUSTOMER_SALES_DIR]:
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 

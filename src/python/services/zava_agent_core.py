@@ -5,21 +5,29 @@ from agent_framework.openai import OpenAIChatCompletionClient
 from agent_framework import MCPStdioTool
 
 # Import unified LLM config
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'src', 'python')))
-from shared.llm_config import get_azure_or_openai_client, get_model_name
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+from shared.llm_config import get_model_name
 
 async def get_agent_response(user_input: str, history_context: str = "") -> str:
     """
     Core Single-Agent logic for Zava AI Analyst.
     """
     
-    # Use centralized factory to get the correct AsyncOpenAI client
-    async_client = get_azure_or_openai_client(is_async=True)
+    azure_key = os.getenv("AZURE_OPENAI_KEY")
+    azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+    openai_key = os.getenv("OPENAI_API_KEY")
     
-    provider = OpenAIChatCompletionClient(
-        client=async_client,
-        model=get_model_name()
-    )
+    if azure_key and azure_endpoint:
+        provider = OpenAIChatCompletionClient(
+            model=get_model_name(),
+            api_key=azure_key,
+            base_url=azure_endpoint
+        )
+    else:
+        provider = OpenAIChatCompletionClient(
+            model=get_model_name(),
+            api_key=openai_key
+        )
 
     # Tool 1: Customer Sales (Quick lookups)
     mcp_sales = MCPStdioTool(

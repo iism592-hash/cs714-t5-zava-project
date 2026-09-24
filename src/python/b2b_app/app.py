@@ -3,8 +3,16 @@ import streamlit as st
 import os
 from dotenv import load_dotenv
 
+import sys
+from pathlib import Path
+
+# Add src/python to path so we can import shared modules
+SRC_PYTHON_DIR = Path(__file__).resolve().parent.parent
+if str(SRC_PYTHON_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_PYTHON_DIR))
+
 # Import our shared core logic
-from zava_agent_core import get_agent_response
+from services.zava_agent_core import get_agent_response
 
 # Load environment variables from .env file
 load_dotenv()
