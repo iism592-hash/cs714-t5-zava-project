@@ -552,11 +552,18 @@ function attachCartActions(assistantDiv) {
             btn.onmouseover = () => { btn.style.backgroundColor = '#c2410c'; };
             btn.onmouseout = () => { btn.style.backgroundColor = '#ea580c'; };
 
-            btn.onclick = () => {
-                executeAddAllToCart();
+            btn.onclick = async () => {
                 btn.disabled = true;
-                btn.innerHTML = '✅ All Items Added to Cart!';
-                btn.style.backgroundColor = '#16a34a';
+                btn.textContent = 'Adding items...';
+                const result = await executeAddAllToCart();
+                if (!result) {
+                    btn.disabled = false;
+                    btn.textContent = 'Another cart update is in progress. Try again.';
+                    return;
+                }
+                btn.textContent = `Added ${result.added.length} of ${result.requested} items` +
+                    (result.unavailable.length ? ` — Unavailable: ${result.unavailable.join(', ')}` : '');
+                btn.style.backgroundColor = result.unavailable.length ? '#b45309' : '#16a34a';
                 btn.style.boxShadow = 'none';
             };
 
