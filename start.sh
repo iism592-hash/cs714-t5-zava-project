@@ -1,23 +1,37 @@
 #!/bin/bash
-set -e
-
-echo "=========================================================="
-echo "🚀 STARTING ZAVA DIY MULTI-AGENT CLOUD PLATFORM"
-echo "=========================================================="
-
-echo ">> 1. Launching FastMCP Customer Sales Service (Port 8000)..."
+set -euo pipefail
+if [ "${APP_TYPE:-B2C}" = "B2B" ]; then
+    exec python -m streamlit run src/python/b2b_app/app.py --server.port 8000 --server.address 0.0.0.0
+fi
+pids=()
+cleanup() {
+    trap - EXIT TERM INT
+    if ((${#pids[@]} > 0)); then kill "${pids[@]}" 2>/dev/null || true; fi
+    wait || true
+}
+trap cleanup EXIT TERM INT
 python src/python/mcp_server/customer_sales/customer_sales.py --host 127.0.0.1 --port 8000 &
-MCP_PID=$!
-
-echo ">> Waiting for MCP server..."
-sleep 2
-
-echo ">> 2. Launching Multi-Agent Specialist Service (Port 8006)..."
+pids+=($!)
 python src/python/services/agent_service.py &
-AGENT_PID=$!
-
-echo ">> Waiting for Agent service..."
-sleep 2
-
-echo ">> 3. Launching Public Web Interface (Port 8005)..."
-python src/python/web_app/web_app.py
+pids+=($!)
+python src/python/web_app/web_app.py &
+pids+=($!)
+# Wait for the web interface before declaring startup successful.
+ready=0
+for attempt in {1..30}; do
+    for pid in "${pids[@]}"; do
+        kill -0 "$pid" 2>/dev/null || exit 1
+    done
+    if curl --fail --silent --max-time 2 "http://127.0.0.1:${PORT:-8005}/health" >/dev/null; then
+        ready=1
+        break
+    fi
+    sleep 1
+done
+if ((ready == 0)); then echo 'Web startup health check failed' >&2; exit 1; fi
+# Any service exit terminates the container so the host can restart it.
+set +e
+wait -n "${pids[@]}"
+status=$?
+set -e
+exit "$status"

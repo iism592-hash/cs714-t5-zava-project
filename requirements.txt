@@ -1,0 +1,2 @@
+# Canonical application dependencies (also used by Docker).
+-r src/python/requirements.txt

@@ -25,3 +25,17 @@ DevTunnels/devtunnels-tokens-microsoft
 DevTunnels/devtunnels.json
 infra/output.json
 infra/deploy.err
+
+# Agent Inter-Process Communication (IPC)
+codex_instructions.txt
+codex_results.txt
+
+# Local deployment artifacts and diagnostic output
+/*.zip
+/logs*/
+/b2b_logs*/
+/b2c_logs*/
+/test_unzip*/
+/appsettings.json
+/scripts/local-diagnostics/
+/tests/diagnostics/

@@ -29,6 +29,18 @@ const cartCount = document.getElementById('cartCount');
 const toastNotification = document.getElementById('toastNotification');
 const toastMessage = document.getElementById('toastMessage');
 
+// DOM Elements - Cart Modal
+const cartModalBackdrop = document.getElementById('cartModalBackdrop');
+const cartModal = document.getElementById('cartModal');
+const cartModalBody = document.getElementById('cartModalBody');
+const modalCartSubtitle = document.getElementById('modalCartSubtitle');
+const cartSubtotal = document.getElementById('cartSubtotal');
+const cartTax = document.getElementById('cartTax');
+const cartTotal = document.getElementById('cartTotal');
+const closeCartModalBtn = document.getElementById('closeCartModalBtn');
+const clearCartModalBtn = document.getElementById('clearCartModalBtn');
+const checkoutBtn = document.getElementById('checkoutBtn');
+
 // State
 let isStreaming = false;
 let uploadedFile = null;
@@ -38,7 +50,9 @@ let currentOffset = 0;
 const PAGE_LIMIT = 24;
 let loadedProducts = [];
 let cartTotalItems = 0;
+let cartItems = [];
 let searchDebounceTimer = null;
+let lastRecommendedProducts = [];
 
 // =============================================================================
 // CATALOG CONTROLLER
@@ -58,7 +72,7 @@ async function fetchCategories() {
 
 function renderCategoryPills(categories) {
     categoryPillsContainer.innerHTML = '';
-    
+
     // Sort categories alphabetically
     categories.sort((a, b) => a.category_name.localeCompare(b.category_name));
 
@@ -72,7 +86,7 @@ function renderCategoryPills(categories) {
             .split(' ')
             .map(word => word.charAt(0).toUpperCase() + word.slice(1))
             .join(' ');
-        
+
         btn.textContent = `${formattedName} (${cat.product_count})`;
         btn.addEventListener('click', () => selectCategory(cat.category_name, btn));
         categoryPillsContainer.appendChild(btn);
@@ -88,7 +102,7 @@ function renderCategoryPills(categories) {
 function selectCategory(categoryName, activeBtn) {
     currentCategory = categoryName;
     currentOffset = 0;
-    
+
     // Update active pill styling
     document.querySelectorAll('.category-pill').forEach(pill => pill.classList.remove('active'));
     if (activeBtn) activeBtn.classList.add('active');
@@ -143,7 +157,7 @@ async function fetchProducts(reset = false) {
             loadedProducts = reset ? data.products : [...loadedProducts, ...data.products];
             renderProducts(data.products, !reset);
             resultsCount.textContent = `Showing ${loadedProducts.length} items`;
-            
+
             // Show or hide load more
             if (data.products.length < PAGE_LIMIT) {
                 loadMoreBtn.style.display = 'none';
@@ -184,16 +198,16 @@ function renderProducts(products, append = false) {
 
         // Image handling with fallback
         const imageSrc = product.image_url ? `/images/${product.image_url}` : '/static/favicon.ico';
-        const stockStatus = product.total_stock > 0 ? 
-            `<span class="stock-tag">● In Stock (${product.total_stock.toLocaleString()})</span>` : 
+        const stockStatus = product.total_stock > 0 ?
+            `<span class="stock-tag">● In Stock (${product.total_stock.toLocaleString()})</span>` :
             `<span class="stock-tag low-stock">Special Order</span>`;
 
         card.innerHTML = `
             <div class="product-card-header">
-                <img src="${imageSrc}" 
-                     alt="${escapeHtml(product.product_name)}" 
-                     class="product-img" 
-                     loading="lazy" 
+                <img src="${imageSrc}"
+                     alt="${escapeHtml(product.product_name)}"
+                     class="product-img"
+                     loading="lazy"
                      onerror="this.onerror=null; this.src='/static/favicon.ico';" />
                 <div class="product-badge-group">
                     <span class="category-tag">${escapeHtml(product.category_name)}</span>
@@ -242,22 +256,141 @@ function askAiAboutProduct(product) {
     openAiDrawer();
 
     const query = `I am planning to use "${product.product_name}" (Category: ${product.category_name}, SKU: ${product.sku}, Price: $${product.base_price.toFixed(2)}) for my DIY project. What are the best practices, critical OSHA/PPE safety precautions, and complementary tools or hardware I will need from Zava DIY?`;
-    
+
     messageInput.value = query;
     sendMessage();
 }
 
-function addToCart(product) {
-    cartTotalItems += 1;
+function addToCart(product, qty = 1) {
+    const existing = cartItems.find(item => item.name === product.product_name || (product.sku && item.sku && item.sku === product.sku));
+    if (existing) {
+        existing.qty += qty;
+    } else {
+        cartItems.push({
+            id: product.product_id || '',
+            name: product.product_name,
+            price: parseFloat(product.base_price || product.price || 14.99),
+            qty: qty,
+            image_url: product.image_url || '',
+            sku: product.sku || ''
+        });
+    }
+    updateCartUI();
+    showToast(`Added "${product.product_name}" to your cart!`);
+}
+
+function updateCartUI() {
+    cartTotalItems = cartItems.reduce((sum, item) => sum + item.qty, 0);
     cartCount.textContent = cartTotalItems;
-    
+
     // Animate cart badge
-    cartWidget.style.transform = 'scale(1.15)';
+    cartWidget.style.transform = 'scale(1.25)';
     setTimeout(() => {
         cartWidget.style.transform = 'scale(1)';
     }, 200);
 
-    showToast(`Added "${product.product_name}" to your cart!`);
+    renderCartModal();
+}
+
+function openCartModal() {
+    renderCartModal();
+    if (cartModalBackdrop) {
+        cartModalBackdrop.classList.add('open');
+    }
+}
+
+function closeCartModal() {
+    if (cartModalBackdrop) {
+        cartModalBackdrop.classList.remove('open');
+    }
+}
+
+function renderCartModal() {
+    if (!cartModalBody) return;
+
+    if (modalCartSubtitle) {
+        modalCartSubtitle.textContent = `${cartTotalItems} item${cartTotalItems === 1 ? '' : 's'} in your cart`;
+    }
+
+    if (cartItems.length === 0) {
+        cartModalBody.innerHTML = `
+            <div class="cart-empty-state">
+                <div class="cart-empty-icon">🛒</div>
+                <h4>Your cart is empty</h4>
+                <p>Browse products or ask the AI Advisor to find project materials!</p>
+            </div>
+        `;
+        if (cartSubtotal) cartSubtotal.textContent = '$0.00';
+        if (cartTax) cartTax.textContent = '$0.00';
+        if (cartTotal) cartTotal.textContent = '$0.00';
+        return;
+    }
+
+    let subtotal = 0;
+    cartModalBody.innerHTML = '';
+
+    cartItems.forEach((item, index) => {
+        const itemTotal = item.price * item.qty;
+        subtotal += itemTotal;
+
+        const itemCard = document.createElement('div');
+        itemCard.className = 'cart-item-card';
+
+        const imgSrc = item.image_url ? `/images/${item.image_url}` : '/static/favicon.ico';
+
+        itemCard.innerHTML = `
+            <img src="${imgSrc}" class="cart-item-img" alt="${escapeHtml(item.name)}" onerror="this.src='/static/favicon.ico';" />
+            <div class="cart-item-details">
+                <div class="cart-item-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>
+                <div class="cart-item-price">$${item.price.toFixed(2)} each</div>
+            </div>
+            <div class="cart-item-controls">
+                <button class="cart-qty-btn dec-btn" data-index="${index}">-</button>
+                <span class="cart-qty-val">${item.qty}</span>
+                <button class="cart-qty-btn inc-btn" data-index="${index}">+</button>
+                <button class="cart-item-delete" data-index="${index}" title="Remove item">✕</button>
+            </div>
+        `;
+        cartModalBody.appendChild(itemCard);
+    });
+
+    const tax = subtotal * 0.085;
+    const total = subtotal + tax;
+
+    if (cartSubtotal) cartSubtotal.textContent = `$${subtotal.toFixed(2)}`;
+    if (cartTax) cartTax.textContent = `$${tax.toFixed(2)}`;
+    if (cartTotal) cartTotal.textContent = `$${total.toFixed(2)}`;
+
+    // Quantity dec button
+    cartModalBody.querySelectorAll('.dec-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const idx = parseInt(e.target.dataset.index);
+            cartItems[idx].qty -= 1;
+            if (cartItems[idx].qty <= 0) {
+                cartItems.splice(idx, 1);
+            }
+            updateCartUI();
+        });
+    });
+
+    // Quantity inc button
+    cartModalBody.querySelectorAll('.inc-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const idx = parseInt(e.target.dataset.index);
+            cartItems[idx].qty += 1;
+            updateCartUI();
+        });
+    });
+
+    // Delete item button
+    cartModalBody.querySelectorAll('.cart-item-delete').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const idx = parseInt(e.target.dataset.index);
+            const removed = cartItems.splice(idx, 1);
+            updateCartUI();
+            if (removed[0]) showToast(`Removed "${removed[0].name}" from cart`);
+        });
+    });
 }
 
 function showToast(msg) {
@@ -319,48 +452,167 @@ function formatFileSize(bytes) {
 function handleFileSelection() {
     const file = fileInput.files[0];
     if (!file) return;
-    
+
     if (file.size > 10 * 1024 * 1024) {
         alert('File size must be less than 10MB');
         fileInput.value = '';
         return;
     }
-    
+
     uploadedFile = file;
     addFileInfo(file.name, file.size);
     messageInput.placeholder = `File attached: ${file.name}. Type your question and click send.`;
 }
 
+let bundleAddInProgress = false;
+
+async function executeAddAllToCart() {
+    if (bundleAddInProgress) return null;
+    bundleAddInProgress = true;
+    const recommendations = [...lastRecommendedProducts];
+    const added = [];
+    const unavailable = [];
+    const normalize = name => name.trim().toLowerCase().replace(/\s+/g, ' ');
+    try {
+        for (const item of recommendations) {
+            const name = typeof item === 'string' ? item : item.name;
+            let product = loadedProducts.find(p => normalize(p.product_name || '') === normalize(name));
+            if (!product) {
+                try {
+                    const response = await fetch('/api/products?search=' + encodeURIComponent(name) + '&limit=50');
+                    if (!response.ok) throw new Error('Catalog request failed: ' + response.status);
+                    const data = await response.json();
+                    product = (data.products || []).find(p => normalize(p.product_name || '') === normalize(name));
+                } catch (error) {
+                    console.error('Could not resolve recommended product', name, error);
+                }
+            }
+            if (!product || !Number.isFinite(Number(product.base_price)) || Number(product.base_price) < 0) {
+                unavailable.push(name);
+                continue;
+            }
+            addToCart(product, 1);
+            added.push(product.product_name);
+        }
+        updateCartUI();
+        showToast('Added ' + added.length + ' of ' + recommendations.length + ' items' +
+            (unavailable.length ? '. Unavailable: ' + unavailable.join(', ') : '.'));
+        return { added, unavailable, requested: recommendations.length };
+    } finally {
+        bundleAddInProgress = false;
+    }
+}
+
+function attachCartActions(assistantDiv) {
+    const productLinks = assistantDiv.querySelectorAll('a[href^="#product="]');
+    if (productLinks.length > 0) {
+        const foundProducts = Array.from(productLinks).map(a => {
+            const href = a.getAttribute('href') || '';
+            const keyword = decodeURIComponent(href.replace('#product=', '').replace(/\+/g, ' ')).trim();
+            const linkText = (a.textContent || '').trim();
+            return {
+                name: linkText || keyword,
+                keyword: keyword
+            };
+        });
+
+        // Deduplicate products by display name
+        const uniqueProducts = [];
+        const seenNames = new Set();
+        for (const item of foundProducts) {
+            const key = item.name.toLowerCase();
+            if (!seenNames.has(key)) {
+                seenNames.add(key);
+                uniqueProducts.push(item);
+            }
+        }
+        lastRecommendedProducts = uniqueProducts;
+
+        if (!assistantDiv.querySelector('.cart-action-bar') && lastRecommendedProducts.length > 0) {
+            const bar = document.createElement('div');
+            bar.className = 'cart-action-bar';
+            bar.style.marginTop = '14px';
+            bar.style.paddingTop = '10px';
+            bar.style.borderTop = '1px dashed #cbd5e1';
+
+            const btn = document.createElement('button');
+            btn.className = 'add-all-cart-btn';
+            btn.innerHTML = `🛒 <strong>Yes, Add All (${lastRecommendedProducts.length} items) to Cart</strong>`;
+            btn.style.backgroundColor = '#ea580c';
+            btn.style.color = '#ffffff';
+            btn.style.border = 'none';
+            btn.style.padding = '8px 16px';
+            btn.style.borderRadius = '8px';
+            btn.style.fontWeight = '600';
+            btn.style.cursor = 'pointer';
+            btn.style.fontSize = '0.9rem';
+            btn.style.boxShadow = '0 2px 6px rgba(234, 88, 12, 0.3)';
+            btn.style.transition = 'all 0.2s ease';
+
+            btn.onmouseover = () => { btn.style.backgroundColor = '#c2410c'; };
+            btn.onmouseout = () => { btn.style.backgroundColor = '#ea580c'; };
+
+            btn.onclick = () => {
+                executeAddAllToCart();
+                btn.disabled = true;
+                btn.innerHTML = '✅ All Items Added to Cart!';
+                btn.style.backgroundColor = '#16a34a';
+                btn.style.boxShadow = 'none';
+            };
+
+            bar.appendChild(btn);
+            assistantDiv.appendChild(bar);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+    }
+}
+
 async function sendMessage() {
     const message = messageInput.value.trim();
     if ((!message && !uploadedFile) || isStreaming) return;
-    
+
+    // Check if user is confirming adding to cart (e.g. "yes", "add to cart", "ok")
+    const isAffirmative = /^(yes|yeah|yep|sure|ok|okay|add|please|add to cart|add them|add all|yes please|y)$/i.test(message.trim());
+    if (isAffirmative && lastRecommendedProducts && lastRecommendedProducts.length > 0) {
+        addMessage(message, true);
+        messageInput.value = '';
+        executeAddAllToCart();
+
+        const itemsList = result.added.map(name => `• **${name}**`).join('\n');
+        const confirmMsg = `🛒 **Items Added to Your Shopping Cart!**\n\nI've added the following items to your cart:\n${itemsList}\n\nYour cart now has **${cartTotalItems} item(s)**. You can review your cart at the top right, or let me know if you have questions about the installation steps!`;
+        addMessage(confirmMsg + (result.unavailable.length ? "\n\nUnavailable: " + result.unavailable.join(", ") : ""), false);
+
+        // Reset to prevent double catching
+        lastRecommendedProducts = [];
+        return;
+    }
+
     isStreaming = true;
     sendBtn.disabled = true;
     fileBtn.disabled = true;
-    
+
     try {
         let finalMessage = message;
-        
+
         if (uploadedFile) {
-            const fileMessage = message ? 
-                `${message}\n\n📄 Uploaded file: ${uploadedFile.name}` : 
+            const fileMessage = message ?
+                `${message}\n\n📄 Uploaded file: ${uploadedFile.name}` :
                 `📄 Please analyze this project attachment: ${uploadedFile.name}`;
             addMessage(fileMessage, true);
-            
+
             const formData = new FormData();
             formData.append('file', uploadedFile);
             if (message) formData.append('message', message);
-            
+
             const uploadResponse = await fetch('/upload', {
                 method: 'POST',
                 body: formData
             });
-            
+
             if (!uploadResponse.ok) {
                 throw new Error('File upload failed');
             }
-            
+
             const uploadResult = await uploadResponse.json();
             finalMessage = uploadResult.content || 'Please analyze this file.';
             uploadedFile = null;
@@ -369,24 +621,25 @@ async function sendMessage() {
         } else {
             addMessage(message, true);
         }
-        
+
         messageInput.value = '';
-        
+
         // Assistant streaming container
         const assistantDiv = document.createElement('div');
         assistantDiv.className = 'message assistant';
         messagesDiv.appendChild(assistantDiv);
-        
+
         // Stream via Server-Sent Events from web_app.py
         const eventSource = new EventSource('/chat/stream?' + new URLSearchParams({
             message: finalMessage
         }));
-        
+
         let assistantMessage = '';
-        
+
         eventSource.onmessage = function(event) {
             if (event.data === '[DONE]') {
                 assistantDiv.innerHTML = marked.parse(assistantMessage);
+                attachCartActions(assistantDiv);
                 eventSource.close();
                 isStreaming = false;
                 sendBtn.disabled = false;
@@ -394,16 +647,21 @@ async function sendMessage() {
                 messageInput.focus();
                 return;
             }
-            
+
             try {
                 const parsed = JSON.parse(event.data);
-                
+
+                if (parsed.action === 'add_all_to_cart') {
+                    executeAddAllToCart();
+                }
+
                 if (parsed.content) {
                     assistantMessage += parsed.content;
                     assistantDiv.innerHTML = marked.parse(assistantMessage);
                     messagesDiv.scrollTop = messagesDiv.scrollHeight;
                 } else if (parsed.done) {
                     assistantDiv.innerHTML = marked.parse(assistantMessage);
+                    attachCartActions(assistantDiv);
                     eventSource.close();
                     isStreaming = false;
                     sendBtn.disabled = false;
@@ -421,7 +679,7 @@ async function sendMessage() {
                 console.error('SSE JSON error:', e);
             }
         };
-        
+
         eventSource.onerror = function(event) {
             console.error('EventSource error:', event);
             if (!assistantMessage) {
@@ -435,13 +693,13 @@ async function sendMessage() {
             fileBtn.disabled = false;
             messageInput.focus();
         };
-        
+
     } catch (error) {
         const errorDiv = document.createElement('div');
         errorDiv.className = 'message assistant';
         errorDiv.innerHTML = `<span style="color: #dc2626;">Error: ${escapeHtml(error.message)}</span>`;
         messagesDiv.appendChild(errorDiv);
-        
+
         isStreaming = false;
         sendBtn.disabled = false;
         fileBtn.disabled = false;
@@ -517,7 +775,7 @@ if (toggleAiDrawerBtn) {
 catalogSearchInput.addEventListener('input', (e) => {
     searchQuery = e.target.value;
     clearSearchBtn.style.display = searchQuery ? 'block' : 'none';
-    
+
     if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
     searchDebounceTimer = setTimeout(() => {
         fetchProducts(true);
@@ -565,9 +823,82 @@ messageInput.addEventListener('keydown', (e) => {
 fileBtn.addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', handleFileSelection);
 
-// Cart Click
-cartWidget.addEventListener('click', () => {
-    showToast(`You have ${cartTotalItems} item(s) in your cart.`);
+// Cart Click -> Open Cart Modal
+cartWidget.addEventListener('click', openCartModal);
+
+// Close Cart Modal
+if (closeCartModalBtn) closeCartModalBtn.addEventListener('click', closeCartModal);
+if (cartModalBackdrop) {
+    cartModalBackdrop.addEventListener('click', (e) => {
+        if (e.target === cartModalBackdrop) closeCartModal();
+    });
+}
+
+// Clear Cart Modal
+if (clearCartModalBtn) {
+    clearCartModalBtn.addEventListener('click', () => {
+        cartItems = [];
+        updateCartUI();
+        showToast('Cart has been cleared');
+    });
+}
+
+// Checkout Button
+if (checkoutBtn) {
+    checkoutBtn.addEventListener('click', () => {
+        if (cartItems.length === 0) {
+            alert('Your cart is currently empty!');
+            return;
+        }
+        const orderId = 'ZV-' + Math.floor(100000 + Math.random() * 900000);
+        const totalAmount = cartTotal ? cartTotal.textContent : '$0.00';
+        alert(`🎉 Order Placed Successfully!\n\nThank you for choosing Zava DIY Hardware!\nYour Order Number: ${orderId}\nTotal: ${totalAmount}\n\nYour items are reserved and ready for pickup at our Seattle store.`);
+        cartItems = [];
+        updateCartUI();
+        closeCartModal();
+    });
+}
+
+// Delegate clicks on product links inside chat messages
+messagesDiv.addEventListener('click', (e) => {
+    const link = e.target.closest('a');
+    if (!link) return;
+
+    const href = link.getAttribute('href') || '';
+    if (href.startsWith('#product=') || href.startsWith('#sku=')) {
+        e.preventDefault();
+        let queryTerm = '';
+        if (href.startsWith('#product=')) {
+            queryTerm = decodeURIComponent(href.replace('#product=', '').replace(/\+/g, ' ')).trim();
+        } else if (href.startsWith('#sku=')) {
+            queryTerm = decodeURIComponent(href.replace('#sku=', '').replace(/\+/g, ' ')).trim();
+        }
+
+        if (queryTerm) {
+            catalogSearchInput.value = queryTerm;
+            searchQuery = queryTerm;
+            clearSearchBtn.style.display = 'block';
+
+            // Switch category filter to All
+            currentCategory = 'All';
+            document.querySelectorAll('.category-pill').forEach(pill => {
+                pill.classList.toggle('active', pill.dataset.category === 'All');
+            });
+
+            catalogTitle.textContent = `Search: "${queryTerm}"`;
+            fetchProducts(true);
+            showToast(`Loading "${queryTerm}" in catalog...`);
+
+            // On mobile devices, close drawer so customer sees product card
+            if (window.innerWidth <= 1024) {
+                closeAiDrawer();
+            }
+
+            // Scroll to catalog grid smoothly
+            const targetPos = productGrid.getBoundingClientRect().top + window.pageYOffset - 120;
+            window.scrollTo({ top: targetPos, behavior: 'smooth' });
+        }
+    }
 });
 
 // Initialize on page load (handles already loaded DOM)
