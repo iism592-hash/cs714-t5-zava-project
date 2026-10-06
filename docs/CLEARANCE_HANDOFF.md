@@ -19,3 +19,14 @@ checkout. Checkout must revalidate offers when a purchasing service is implement
 The web-app installation hook is the only change to the existing backend file;
 unrelated local backend work remains outside this commit. Existing banner/cart
 HTML is included because the current frontend requires those elements.
+
+## Live verification (6 October 2026)
+
+Deployed `zavaacrfntj.azurecr.io/zava-agent:clearance-2`, digest
+`sha256:61b0d665a04959e57e20747424a022f28b3afe11e0a3d7720c6de520d9ddabbb`.
+Live `/api/clearance` returned HTTP 200 with no offers; the button displayed the
+empty clearance state, and All Products restored 24 normal catalog items.
+Both web and agent health checks passed after warmup. Several initial requests
+timed out during startup, then recovered. No live discounted item was tested
+because no production offers were created. Local SQL and cart-price tests passed.
+The branch was pushed; PR creation through the GitHub connector returned HTTP 403.
