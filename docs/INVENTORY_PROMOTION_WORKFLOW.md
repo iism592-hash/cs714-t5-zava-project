@@ -56,21 +56,22 @@ scans may create pending recommendations. Testing does not approve actual offers
 
 ## Live verification — 7 October 2026 (Europe/London)
 
-Code commit `225494f` pushed; draft PR #1 is stacked on the clearance branch.
-B2B runs `inventory-workflow-final` (digest
-`sha256:2c75d02c39b71534a54bab2793171612e4a1a4258c099d12c2d582186c57b170`);
-B2C runs `inventory-workflow-3` (digest
-`sha256:603f2471b2f8851cd79216228e5137aa83510fa6ac1e59cbc872b08cfcaecf9f`).
-The final B2B image adds the read-only analyst guard; B2C price logic is unchanged.
-Azure migration succeeded from a disposable internal container, which was removed.
+Implementation commits `225494f`, `c07776f` and `f614144` are pushed; draft
+PR #1 is stacked on the clearance branch. B2B runs `inventory-workflow-final-2`
+(digest `sha256:ba17f89ea87249cc54db560de725404665629918e6de33d0c292e0d75a558263`);
+B2C runs `inventory-workflow-3`
+(digest `sha256:603f2471b2f8851cd79216228e5137aa83510fa6ac1e59cbc872b08cfcaecf9f`).
+
 An authenticated live scan generated 424 pending warnings; restart preserved them.
 Live AI explanation completed and clearance remained empty (no approved offers).
+The B2B warning pane refreshes every 60 seconds while open, shows pending-review
+counts and retains the selected recommendation's AI explanation across refreshes.
+Azure migration succeeded from a disposable internal container, which was removed.
 B2B and B2C health checks returned 200 after container warmup recovered.
+
 All local workflow, login, read-only SQL and cart tests passed. Approval mutations
 used rollback fixtures only; actual future 08:00 execution was not awaited.
-
-Final boundary correction `c07776f`: the 90-day cover rule also applies below
-100 units when recent sales are positive; the 100-unit floor is only for zero
-recent sales. The 50-stock/5-sales case and full workflow integration passed.
-B2B final image is `inventory-workflow-final-1`, digest
-`sha256:39b9f6d2f2d08190a36eb582bb88b9f0b2d9ec901829c0132a483b24c4b57d4d`.
+The 90-day cover rule also applies below 100 units when recent sales are positive;
+the 100-unit floor is only for zero recent sales. The 50-stock/5-sales case and
+full workflow integration passed. Streamlit login/control tests passed with the
+final fragment refresh enabled.
