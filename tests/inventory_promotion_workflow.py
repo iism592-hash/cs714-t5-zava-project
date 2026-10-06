@@ -20,6 +20,7 @@ async def main():
     assert service.recommend(5,50,100,60)[0]=='low_stock'
     assert service.recommend(300,30,100,60)[1]==20
     assert service.recommend(120,0,100,60)[1]==10
+    assert service.recommend(50,5,100,60)[0]=='overstock'
     assert service.recommend(50,30,100,60) is None
     assert service.max_discount(100,95)==0
     assert due_day(datetime(2026,7,1,14,59,tzinfo=timezone.utc),'America/Los_Angeles',8) is None

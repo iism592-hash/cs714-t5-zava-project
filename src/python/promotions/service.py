@@ -9,7 +9,7 @@ def recommend(stock, sold, base_price, cost):
     days = stock * 30 / sold if sold > 0 else None
     if stock <= 10 or (sold > 0 and days < 7):
         return 'low_stock', 0, f'Stock {stock}; last 30 days sold {sold}. Restock; no discount recommended.'
-    if stock >= 100 and (sold == 0 or days >= 90):
+    if (stock >= 100 and sold == 0) or (sold > 0 and days >= 90):
         target = 10 if sold == 0 else (20 if days >= 180 else 10)
         maximum = max_discount(base_price, cost)
         discount = min(target, maximum)
