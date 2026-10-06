@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 import streamlit as st
 import os
 from dotenv import load_dotenv
@@ -17,9 +17,11 @@ from services.zava_agent_core import get_agent_response
 # Load environment variables from .env file
 load_dotenv()
 
-st.set_page_config(page_title="Zava AI Analyst", page_icon="??", layout="wide")
-st.title("?? Zava Enterprise AI Analyst")
+st.set_page_config(page_title="Zava AI Analyst", page_icon="📊", layout="wide")
+st.title("📊 Zava Enterprise AI Analyst")
 st.markdown("Ask me anything about Zava's inventory, sales, or customer data!")
+from promotions.ui import render_inventory_dashboard
+render_inventory_dashboard()
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -35,7 +37,7 @@ if prompt := st.chat_input("Ask a business question..."):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        with st.spinner("?? Analyst is thinking and querying the database..."):
+        with st.spinner("📊 Analyst is thinking and querying the database..."):
             history_context = ""
             for msg in st.session_state.messages[:-1]:
                 role = "User" if msg["role"] == "user" else "AI"

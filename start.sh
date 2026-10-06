@@ -1,8 +1,5 @@
 #!/bin/bash
 set -euo pipefail
-if [ "${APP_TYPE:-B2C}" = "B2B" ]; then
-    exec python -m streamlit run src/python/b2b_app/app.py --server.port 8000 --server.address 0.0.0.0
-fi
 pids=()
 cleanup() {
     trap - EXIT TERM INT
@@ -10,6 +7,17 @@ cleanup() {
     wait || true
 }
 trap cleanup EXIT TERM INT
+if [ "${APP_TYPE:-B2C}" = "B2B" ]; then
+    python -m promotions.worker &
+    pids+=($!)
+    python -m streamlit run src/python/b2b_app/app.py --server.port 8000 --server.address 0.0.0.0 &
+    pids+=($!)
+    set +e
+    wait -n "${pids[@]}"
+    status=$?
+    set -e
+    exit "$status"
+fi
 python src/python/mcp_server/customer_sales/customer_sales.py --host 127.0.0.1 --port 8000 &
 pids+=($!)
 python src/python/services/agent_service.py &

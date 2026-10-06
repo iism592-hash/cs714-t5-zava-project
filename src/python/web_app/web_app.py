@@ -316,9 +316,9 @@ class WebApp:
             """
             
             rows = await conn.fetch(query, cat_filter, search_filter, limit, offset)
+            from clearance import apply_current_offers
+            products = await apply_current_offers(conn, [dict(r) for r in rows])
             await conn.close()
-            
-            products = [dict(r) for r in rows]
             return {
                 "products": products,
                 "count": len(products),

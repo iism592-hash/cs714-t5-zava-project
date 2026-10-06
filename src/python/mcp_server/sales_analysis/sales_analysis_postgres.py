@@ -686,7 +686,8 @@ class PostgreSQLSchemaProvider:
                 "SELECT set_config('app.current_rls_user_id', $1, false)", rls_user_id)
 
             # logger.info(f"\n🔍 Executing PostgreSQL query: {sql_query}\n")
-            rows = await conn.fetch(sql_query)
+            from promotions.readonly import fetch_analysis_rows
+            rows = await fetch_analysis_rows(conn, sql_query)
 
             if not rows:
                 return json.dumps(
