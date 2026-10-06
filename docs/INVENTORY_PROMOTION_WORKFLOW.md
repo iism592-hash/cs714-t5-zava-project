@@ -6,6 +6,9 @@ If restarted after the scheduled time, it catches up; a PostgreSQL advisory lock
 and unique scan date prevent duplicate runs across restarts or instances.
 Failures retry in 60 seconds. Check inventory now refreshes pending warnings
 without overwriting existing manager decisions.
+The B2B warning pane refreshes every 60 seconds while the page is open, so a new
+morning scan is visible without manually reloading. AI explanations are retained
+in the signed-in session across these refreshes.
 
 Rules use current aggregate stock and units sold during the preceding 30 days,
 ending on the scan date. Low stock is ≤10 units or <7 days of cover. Overstock

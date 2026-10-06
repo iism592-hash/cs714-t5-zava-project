@@ -8,6 +8,7 @@ from .auth import verify_manager
 from .service import dashboard, scan_inventory, decide, max_discount
 
 
+@st.fragment(run_every=60)
 def render_inventory_dashboard():
     st.subheader('Inventory warnings & promotion review')
     timezone = os.getenv('INVENTORY_CHECK_TIMEZONE', 'America/Los_Angeles')
@@ -68,6 +69,8 @@ def render_inventory_dashboard():
     if not rows:
         st.success('No inventory warnings.')
         return
+    pending_count = sum(r['status']=='pending' for r in rows)
+    st.warning(f"{run['warning_count']} inventory warnings; {pending_count} recommendations awaiting manager review.")
     st.dataframe([{k: r[k] for k in ('recommendation_id','product_name','warning_type','stock_level','sold_30_days','suggested_discount','status')} for r in rows], hide_index=True, use_container_width=True)
     row = st.selectbox('Select a recommendation', rows,
         format_func=lambda r: f"#{r['recommendation_id']} · {r['product_name']} · {r['status']}")
@@ -78,9 +81,13 @@ def render_inventory_dashboard():
         prompt = f"Explain this inventory recommendation using ONLY these supplied facts. Do not invent competitor prices, demand or weather. Do not approve or write any discount. Product {row['product_name']}, stock {row['stock_level']}, units sold last 30 days {row['sold_30_days']}, suggested discount {row['suggested_discount']}%, reason: {row['reason']}. Explain uncertainties and recommend whether the manager should consider promotion, under 150 words."
         try:
             with st.spinner('Preparing AI explanation...'):
-                st.write(asyncio.run(get_agent_response(prompt, '')))
+                explanation = asyncio.run(get_agent_response(prompt, ''))
+                st.session_state['promotion_explanation'] = (row['recommendation_id'], explanation)
         except Exception:
             st.error('AI explanation is unavailable. The inventory facts and review controls remain available.')
+    explanation = st.session_state.get('promotion_explanation')
+    if explanation and explanation[0] == row['recommendation_id']:
+        st.write(explanation[1])
     if row['status'] == 'pending':
         maximum = max_discount(row['base_price'], row['cost']) if row['warning_type']=='overstock' else 0
         with st.form(f"promotion_decision_{row['recommendation_id']}"):
