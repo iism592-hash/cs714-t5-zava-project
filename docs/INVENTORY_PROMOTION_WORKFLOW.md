@@ -65,3 +65,9 @@ Live AI explanation completed and clearance remained empty (no approved offers).
 B2B and B2C health checks returned 200 after container warmup recovered.
 All local workflow, login, read-only SQL and cart tests passed. Approval mutations
 used rollback fixtures only; actual future 08:00 execution was not awaited.
+
+Final boundary correction `c07776f`: the 90-day cover rule also applies below
+100 units when recent sales are positive; the 100-unit floor is only for zero
+recent sales. The 50-stock/5-sales case and full workflow integration passed.
+B2B final image is `inventory-workflow-final-1`, digest
+`sha256:39b9f6d2f2d08190a36eb582bb88b9f0b2d9ec901829c0132a483b24c4b57d4d`.
