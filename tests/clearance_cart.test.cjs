@@ -1,0 +1,17 @@
+const fs = require('node:fs');
+const vm = require('node:vm');
+const assert = require('node:assert/strict');
+const source = fs.readFileSync('src/shared/static/chat.js', 'utf8');
+const code = source.slice(source.indexOf('function catalogPrice('), source.indexOf('function updateCartUI('));
+const ctx = { cartItems: [], updateCartUI() {}, showToast() {} };
+vm.createContext(ctx);
+vm.runInContext(code, ctx);
+assert.equal(ctx.catalogPrice({base_price: 50, sale_price: 40}), 40);
+assert.equal(ctx.catalogPrice({base_price: 50, sale_price: 0}), 0);
+assert.throws(() => ctx.catalogPrice({base_price: 'invalid'}));
+ctx.addToCart({product_id: 1, product_name: 'Fixture', sku: 'TEST', base_price: 50});
+ctx.addToCart({product_id: 1, product_name: 'Fixture', sku: 'TEST', base_price: 50, sale_price: 40});
+assert.equal(ctx.cartItems[0].price, 40);
+assert.equal(ctx.cartItems[0].qty, 2);
+assert.equal(ctx.cartItems.reduce((sum, item) => sum + item.price * item.qty, 0), 80);
+console.log('PASS: sale and zero prices, invalid-price rejection, existing cart repricing');

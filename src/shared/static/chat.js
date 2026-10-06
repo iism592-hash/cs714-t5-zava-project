@@ -45,6 +45,7 @@ const checkoutBtn = document.getElementById('checkoutBtn');
 let isStreaming = false;
 let uploadedFile = null;
 let currentCategory = 'All';
+let clearanceOnly = false;
 let searchQuery = '';
 let currentOffset = 0;
 const PAGE_LIMIT = 24;
@@ -52,6 +53,7 @@ let loadedProducts = [];
 let cartTotalItems = 0;
 let cartItems = [];
 let searchDebounceTimer = null;
+let catalogRequestSequence = 0;
 let lastRecommendedProducts = [];
 
 // =============================================================================
@@ -100,6 +102,7 @@ function renderCategoryPills(categories) {
 }
 
 function selectCategory(categoryName, activeBtn) {
+    clearanceOnly = false;
     currentCategory = categoryName;
     currentOffset = 0;
 
@@ -123,9 +126,11 @@ function selectCategory(categoryName, activeBtn) {
 }
 
 async function fetchProducts(reset = false) {
+    const requestSequence = ++catalogRequestSequence;
     if (reset) {
         currentOffset = 0;
         loadedProducts = [];
+        loadMoreBtn.style.display = 'none';
         productGrid.innerHTML = `
             <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #64748b;">
                 <div style="font-size: 1.5rem; margin-bottom: 8px;">⏳</div>
@@ -146,8 +151,11 @@ async function fetchProducts(reset = false) {
             params.append('search', searchQuery.trim());
         }
 
-        const response = await fetch(`/api/products?${params.toString()}`);
+        const response = await fetch(`${clearanceOnly ? '/api/clearance' : '/api/products'}?${params.toString()}`);
+        if (!response.ok) throw new Error('Catalog request failed: ' + response.status);
         const data = await response.json();
+        if (requestSequence !== catalogRequestSequence) return;
+        if (data.error) throw new Error(data.error);
 
         if (reset) {
             productGrid.innerHTML = '';
@@ -169,8 +177,8 @@ async function fetchProducts(reset = false) {
                 productGrid.innerHTML = `
                     <div style="grid-column: 1/-1; text-align: center; padding: 60px 20px; color: #64748b;">
                         <div style="font-size: 2.2rem; margin-bottom: 12px;">🔍</div>
-                        <h3 style="color: #0f172a; margin-bottom: 6px;">No products match your criteria</h3>
-                        <p>Try searching for a different keyword or selecting another category.</p>
+                        <h3 style="color: #0f172a; margin-bottom: 6px;">${clearanceOnly ? 'No active clearance offers' : 'No products match your criteria'}</h3>
+                        <p>${clearanceOnly ? 'No approved clearance offers match this view. Select All Products to browse the full catalog.' : 'Try searching for a different keyword or selecting another category.'}</p>
                     </div>
                 `;
                 resultsCount.textContent = '0 items found';
@@ -178,6 +186,9 @@ async function fetchProducts(reset = false) {
             loadMoreBtn.style.display = 'none';
         }
     } catch (err) {
+        if (requestSequence !== catalogRequestSequence) return;
+        resultsCount.textContent = 'Catalog unavailable';
+        loadMoreBtn.style.display = 'none';
         console.error('Failed to load products:', err);
         productGrid.innerHTML = `
             <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #dc2626;">
@@ -219,7 +230,9 @@ function renderProducts(products, append = false) {
                 <h3 class="product-name" title="${escapeHtml(product.product_name)}">${escapeHtml(product.product_name)}</h3>
                 <p class="product-desc">${escapeHtml(product.product_description || '')}</p>
                 <div class="product-pricing">
-                    <span class="product-price">$${product.base_price ? product.base_price.toFixed(2) : '0.00'}</span>
+                    ${product.sale_price != null ? `<del aria-label="Original price">$${Number(product.base_price).toFixed(2)}</del>` : ''}
+                    <span class="product-price">$${catalogPrice(product).toFixed(2)}</span>
+                    ${product.sale_price != null ? '<span class="clearance-badge">Clearance</span>' : ''}
                     <span class="stock-count-text">${product.type_name || ''}</span>
                 </div>
                 <div class="card-actions">
@@ -255,21 +268,29 @@ function askAiAboutProduct(product) {
     // Ensure AI side panel is open and visible
     openAiDrawer();
 
-    const query = `I am planning to use "${product.product_name}" (Category: ${product.category_name}, SKU: ${product.sku}, Price: $${product.base_price.toFixed(2)}) for my DIY project. What are the best practices, critical OSHA/PPE safety precautions, and complementary tools or hardware I will need from Zava DIY?`;
+    const query = `I am planning to use "${product.product_name}" (Category: ${product.category_name}, SKU: ${product.sku}, Price: $${catalogPrice(product).toFixed(2)}) for my DIY project. What are the best practices, critical OSHA/PPE safety precautions, and complementary tools or hardware I will need from Zava DIY?`;
 
     messageInput.value = query;
     sendMessage();
 }
 
+function catalogPrice(product) {
+    const price = Number(product.sale_price ?? product.base_price ?? product.price);
+    if (!Number.isFinite(price) || price < 0) throw new Error('Invalid catalog price');
+    return price;
+}
+
 function addToCart(product, qty = 1) {
+    const price = catalogPrice(product);
     const existing = cartItems.find(item => item.name === product.product_name || (product.sku && item.sku && item.sku === product.sku));
     if (existing) {
         existing.qty += qty;
+        existing.price = price;
     } else {
         cartItems.push({
             id: product.product_id || '',
             name: product.product_name,
-            price: parseFloat(product.base_price || product.price || 14.99),
+            price,
             qty: qty,
             image_url: product.image_url || '',
             sku: product.sku || ''
@@ -779,6 +800,20 @@ if (toggleAiDrawerBtn) {
 }
 
 // Search Input Listener (Debounced)
+const shopClearanceBtn = document.getElementById('shopClearanceBtn');
+if (shopClearanceBtn) shopClearanceBtn.addEventListener('click', () => {
+    clearanceOnly = true;
+    currentCategory = 'All';
+    searchQuery = '';
+    catalogSearchInput.value = '';
+    clearSearchBtn.style.display = 'none';
+    clearTimeout(searchDebounceTimer);
+    document.querySelectorAll('.category-pill').forEach(pill => pill.classList.remove('active'));
+    catalogTitle.textContent = 'Clearance & Overstock Specials';
+    fetchProducts(true);
+    document.getElementById('catalogSection').scrollIntoView({behavior: 'smooth'});
+});
+
 catalogSearchInput.addEventListener('input', (e) => {
     searchQuery = e.target.value;
     clearSearchBtn.style.display = searchQuery ? 'block' : 'none';
@@ -800,9 +835,9 @@ clearSearchBtn.addEventListener('click', () => {
 sortSelect.addEventListener('change', () => {
     const sortVal = sortSelect.value;
     if (sortVal === 'price-asc') {
-        loadedProducts.sort((a, b) => a.base_price - b.base_price);
+        loadedProducts.sort((a, b) => catalogPrice(a) - catalogPrice(b));
     } else if (sortVal === 'price-desc') {
-        loadedProducts.sort((a, b) => b.base_price - a.base_price);
+        loadedProducts.sort((a, b) => catalogPrice(b) - catalogPrice(a));
     } else if (sortVal === 'stock-desc') {
         loadedProducts.sort((a, b) => b.total_stock - a.total_stock);
     } else {
@@ -888,6 +923,7 @@ messagesDiv.addEventListener('click', (e) => {
 
             // Switch category filter to All
             currentCategory = 'All';
+            clearanceOnly = false;
             document.querySelectorAll('.category-pill').forEach(pill => {
                 pill.classList.toggle('active', pill.dataset.category === 'All');
             });

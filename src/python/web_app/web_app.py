@@ -334,6 +334,8 @@ app = FastAPI(title="Azure AI Agent Web Interface")
 
 # Initialize web app
 web_app = WebApp(app)
+from clearance import install_clearance_routes
+install_clearance_routes(web_app)
 
 
 if __name__ == "__main__":

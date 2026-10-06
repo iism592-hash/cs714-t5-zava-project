@@ -16,13 +16,13 @@
 
 :root {
     --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    
+
     /* Surface Colors */
     --bg-page: #f8fafc;
     --bg-card: #ffffff;
     --border-color: #e2e8f0;
     --border-focus: #3b82f6;
-    
+
     /* Slate Neutrals */
     --slate-900: #0f172a;
     --slate-800: #1e293b;
@@ -34,7 +34,7 @@
     --slate-200: #e2e8f0;
     --slate-100: #f1f5f9;
     --slate-50:  #f8fafc;
-    
+
     /* Brand Accents */
     --brand-orange: #ea580c;
     --brand-orange-hover: #c2410c;
@@ -1037,7 +1037,7 @@ body {
                 <span class="store-status"><span class="pulse-dot"></span> Seattle Store: Open until 9 PM</span>
             </div>
         </div>
-        
+
         <div class="header-main">
             <div class="brand-container">
                 <div class="brand-logo">
@@ -1079,9 +1079,15 @@ body {
         </nav>
     </header>
 
+    <div style="background-color: #fef2f2; padding: 12px; text-align: center; font-weight: 600; font-size: 1.1rem; display: flex; justify-content: center; align-items: center; gap: 10px; border-bottom: 2px solid #b91c1c;">
+        <span style="font-size: 1.4rem;">🚨</span>
+        <span>Clearance & Overstock Specials: Browse current approved offers. Discounts apply only to listed clearance items.</span>
+        <button id="shopClearanceBtn" style="background: white; color: #ef4444; border: none; padding: 6px 16px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-left: 15px; text-transform: uppercase; font-size: 0.9rem; transition: background-color 0.2s;">Shop Clearance</button>
+    </div>
+
     <!-- MAIN TWO-COLUMN COMMERCIAL LAYOUT -->
     <main class="store-layout" id="storeLayout">
-        
+
         <!-- LEFT/CENTER: PRODUCT CATALOG SHOWCASE -->
         <section class="catalog-section" id="catalogSection">
             <div class="catalog-toolbar">
@@ -1173,6 +1179,45 @@ body {
         <span class="toast-message" id="toastMessage">Item added to cart</span>
     </div>
 
-    <script src="/static/chat.js?v=2"></script>
+    <!-- SHOPPING CART POPUP MODAL & DRAWER -->
+    <div class="cart-modal-backdrop" id="cartModalBackdrop">
+        <div class="cart-modal" id="cartModal">
+            <div class="cart-modal-header">
+                <div class="cart-modal-title">
+                    <span class="cart-modal-icon">🛒</span>
+                    <div>
+                        <h3>Your Shopping Cart</h3>
+                        <p class="cart-modal-subtitle" id="modalCartSubtitle">0 items in your cart</p>
+                    </div>
+                </div>
+                <button class="cart-modal-close" id="closeCartModalBtn" title="Close Cart">&times;</button>
+            </div>
+
+            <div class="cart-modal-body" id="cartModalBody">
+                <!-- Dynamically populated cart items -->
+            </div>
+
+            <div class="cart-modal-footer" id="cartModalFooter">
+                <div class="cart-summary-line">
+                    <span>Subtotal</span>
+                    <span id="cartSubtotal">$0.00</span>
+                </div>
+                <div class="cart-summary-line">
+                    <span>Estimated Tax (8.5%)</span>
+                    <span id="cartTax">$0.00</span>
+                </div>
+                <div class="cart-summary-line cart-total-line">
+                    <span>Estimated Total</span>
+                    <span id="cartTotal">$0.00</span>
+                </div>
+                <div class="cart-modal-buttons">
+                    <button class="btn-clear-cart" id="clearCartModalBtn">Clear Cart</button>
+                    <button class="btn-checkout" id="checkoutBtn">Proceed to Checkout 💳</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/chat.js?v=clearance-1"></script>
 </body>
 </html>
