@@ -34,3 +34,12 @@ working tree. No catalog products or real discounts are created by this fix.
 Deployment image: catalog-grounding-2, digest
 sha256:22fe77f9b21779618cf26e7a052823f50156faca2746f054e0f2573c277e3f9c.
 
+Live regression, 7 October 2026 (Europe/London): the original Install GFCI
+question completed all specialist stages. Insulated gloves and safety goggles
+appeared as plain-text equipment to prepare separately, with no shopping links.
+Five exact catalog products remained linked with matching prices. Bulk add
+reported Added 5 of 5 items; cart subtotal $155.23, estimated tax $13.19 and total
+$168.42 matched the catalog. No unavailable PPE was counted as a cart item.
+Health returned HTTP 200 with web and agent healthy after deployment warmup.
+Screenshot: catalog-grounding-proof.jpg. No checkout or real promotion action
+was submitted.
