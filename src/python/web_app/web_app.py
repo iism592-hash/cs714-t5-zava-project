@@ -26,6 +26,7 @@ import httpx
 from fastapi import FastAPI, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from product_grounding import ProductLinkGuard, load_catalog
 
 # Configure logging
 logging.basicConfig(level=logging.ERROR)
@@ -149,6 +150,12 @@ class WebApp:
     async def _generate_stream(self, message: str, session_id: str) -> AsyncGenerator[str, None]:
         """Generate streaming response by proxying to agent service."""
         try:
+            try:
+                catalog = await load_catalog(self.get_products)
+            except Exception:
+                logging.error('Chat catalog verification failed; shopping links disabled.')
+                catalog = None
+            link_guard = ProductLinkGuard(catalog)
             async with httpx.AsyncClient(timeout=120.0) as client:
                 # Make request to agent service
                 request_data = {
@@ -179,8 +186,10 @@ class WebApp:
                                         
                                         # Convert agent service response format to web format
                                         if data.get("content"):
-                                            assistant_message += data["content"]
-                                            yield f"data: {json.dumps({'content': data['content']})}\n\n"
+                                            checked_content = link_guard.feed(data["content"])
+                                            if checked_content:
+                                                assistant_message += checked_content
+                                                yield f"data: {json.dumps({'content': checked_content})}\n\n"
                                         elif data.get("file_info"):
                                             yield f"data: {json.dumps({'file': data['file_info']})}\n\n"
                                         elif data.get("error"):
@@ -192,6 +201,10 @@ class WebApp:
                                         # Skip malformed JSON
                                         continue
                     
+                    checked_content = link_guard.finish()
+                    if checked_content:
+                        assistant_message += checked_content
+                        yield f"data: {json.dumps({'content': checked_content})}\n\n"
                     # Add complete message to session
                     if assistant_message:
                         self.chat_sessions[session_id].append({

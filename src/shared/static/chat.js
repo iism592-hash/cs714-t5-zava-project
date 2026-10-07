@@ -604,7 +604,8 @@ async function sendMessage() {
     if (isAffirmative && lastRecommendedProducts && lastRecommendedProducts.length > 0) {
         addMessage(message, true);
         messageInput.value = '';
-        executeAddAllToCart();
+        const result = await executeAddAllToCart();
+        if (!result) return;
 
         const itemsList = result.added.map(name => `• **${name}**`).join('\n');
         const confirmMsg = `🛒 **Items Added to Your Shopping Cart!**\n\nI've added the following items to your cart:\n${itemsList}\n\nYour cart now has **${cartTotalItems} item(s)**. You can review your cart at the top right, or let me know if you have questions about the installation steps!`;
