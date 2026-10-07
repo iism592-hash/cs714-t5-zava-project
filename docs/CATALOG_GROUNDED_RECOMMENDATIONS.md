@@ -30,3 +30,7 @@ cart tests also pass. Live deployment evidence is recorded in `codex_results.txt
 The deployment overlays these files onto the existing B2C image; unrelated local
 managed-identity and infrastructure changes are preserved separately in the
 working tree. No catalog products or real discounts are created by this fix.
+
+Deployment image: catalog-grounding-2, digest
+sha256:22fe77f9b21779618cf26e7a052823f50156faca2746f054e0f2573c277e3f9c.
+
