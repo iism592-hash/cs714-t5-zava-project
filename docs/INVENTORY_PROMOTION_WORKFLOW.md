@@ -75,3 +75,14 @@ The 90-day cover rule also applies below 100 units when recent sales are positiv
 the 100-unit floor is only for zero recent sales. The 50-stock/5-sales case and
 full workflow integration passed. Streamlit login/control tests passed with the
 final fragment refresh enabled.
+
+## Compact analyst layout — 7 October 2026
+
+Inventory review now lives in a collapsed sidebar expander. The sidebar starts
+closed so questions and chat history retain the main page. Managers can open
+the sidebar and Inventory & promotions to access the same protected controls.
+The repeated dashboard heading is removed. Login gating and low-stock approval
+checks passed in the sidebar; an AppTest smoke check of the actual B2B entrypoint
+verified question submission and answer rendering with a stubbed model.
+B2B image: inventory-compact-ui, digest
+sha256:40b2f66de732499e27716f3620ca9ceb0b72022de69e0ab0e6a772bebb8a6dfa.

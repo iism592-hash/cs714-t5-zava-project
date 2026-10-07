@@ -16,7 +16,9 @@ async def fixture_dashboard():
         'suggested_discount':0,'status':'pending','reason':'Restock; no discount.',
         'base_price':100,'cost':60}])
 ui.dashboard=fixture_dashboard
-ui.render_inventory_dashboard()
+with st.sidebar:
+    with st.expander('Inventory & promotions', expanded=False):
+        ui.render_inventory_dashboard()
 '''
 app=AppTest.from_string(code).run()
 assert not app.exception

@@ -17,11 +17,13 @@ from services.zava_agent_core import get_agent_response
 # Load environment variables from .env file
 load_dotenv()
 
-st.set_page_config(page_title="Zava AI Analyst", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Zava AI Analyst", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
 st.title("📊 Zava Enterprise AI Analyst")
 st.markdown("Ask me anything about Zava's inventory, sales, or customer data!")
 from promotions.ui import render_inventory_dashboard
-render_inventory_dashboard()
+with st.sidebar:
+    with st.expander("Inventory & promotions", expanded=False):
+        render_inventory_dashboard()
 
 if "messages" not in st.session_state:
     st.session_state.messages = []

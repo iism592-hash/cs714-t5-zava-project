@@ -10,7 +10,6 @@ from .service import dashboard, scan_inventory, decide, max_discount
 
 @st.fragment(run_every=60)
 def render_inventory_dashboard():
-    st.subheader('Inventory warnings & promotion review')
     timezone = os.getenv('INVENTORY_CHECK_TIMEZONE', 'America/Los_Angeles')
     hour = int(os.getenv('INVENTORY_CHECK_HOUR', '8'))
     st.caption(f'Daily inventory check: {hour:02}:00 {timezone}. Discounts require manager approval.')
